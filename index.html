@@ -1,19 +1,19 @@
 <!DOCTYPE html>
-<html>
+<html lang="id">
 <head>
 <meta charset="utf-8">
 <title>Stock Scanner</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
 <script>
   // Show script errors on the page so problems on a phone are visible.
   window.onerror = function (msg, src, line) {
     const d = document.createElement('div');
     d.style.cssText = 'background:#fbe3e3;color:#8a1f1f;padding:10px;margin:8px;border-radius:8px;font:13px monospace';
-    d.textContent = 'Error: ' + msg + ' (line ' + line + ')';
+    d.textContent = 'Error: ' + msg + ' (baris ' + line + ')';
     (document.body || document.documentElement).prepend(d);
   };
 </script>
-<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <style>
   :root {
@@ -24,136 +24,193 @@
   body.OUT { --accent: var(--out); --accent-soft: var(--out-soft); }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.4 -apple-system, system-ui, sans-serif; }
-  .app { max-width: 480px; margin: 0 auto; padding: 12px 16px calc(24px + env(safe-area-inset-bottom)); }
   button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+  .wrap { max-width: 480px; margin: 0 auto; padding: 0 16px; }
 
-  header { display: flex; align-items: center; justify-content: space-between; padding: 4px 0 12px; }
-  header h1 { font-size: 20px; margin: 0; font-weight: 700; }
-  .who { font-size: 13px; color: var(--muted); margin-top: 2px; }
-  .who b { color: var(--in); }
-  .gate { text-align: center; padding: 48px 8px; color: var(--muted); }
-  .gate h1 { color: var(--text); font-size: 22px; margin-bottom: 8px; }
-  .icon-btn { padding: 8px 12px; border-radius: 999px; background: var(--card); border: 1px solid var(--line); font-size: 14px; }
+  .topbar { position: sticky; top: 0; z-index: 10; background: rgba(255,255,255,.92); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); padding-top: env(safe-area-inset-top); }
+  .topbar .wrap { display: flex; align-items: center; justify-content: space-between; height: 56px; }
+  .topbar h1 { font-size: 18px; margin: 0; font-weight: 700; }
+  .me { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--muted); }
+  .me b { color: var(--text); }
+  .avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--text); color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 14px; }
+
+  main.wrap { padding-top: 24px; padding-bottom: calc(32px + env(safe-area-inset-bottom)); }
+  .label { font-size: 13px; font-weight: 600; color: var(--muted); margin: 0 0 10px; }
+  .block { margin-bottom: 24px; }
 
   .seg { display: grid; grid-template-columns: 1fr 1fr; background: #e7e6e1; border-radius: 16px; padding: 4px; }
-  .seg button { padding: 14px 0; border-radius: 12px; font-weight: 700; font-size: 17px; color: var(--muted); transition: .15s; }
+  .seg button { padding: 14px 0; border-radius: 12px; font-weight: 700; font-size: 17px; color: var(--muted); transition: .15s; display: flex; align-items: center; justify-content: center; gap: 8px; }
+  .seg svg { width: 22px; height: 22px; }
+  .stepper svg { width: 24px; height: 24px; }
+  .stepper button { display: grid; place-items: center; }
   .seg button.active.in { background: var(--in); color: #fff; }
   .seg button.active.out { background: var(--out); color: #fff; }
 
-  .cam { position: relative; margin-top: 12px; aspect-ratio: 1 / 1; border-radius: 20px; overflow: hidden; background: #111; }
+  .sheet-bg { position: fixed; inset: 0; z-index: 20; background: rgba(0,0,0,.45); display: flex; align-items: flex-end; justify-content: center; }
+  .sheet { width: 100%; max-width: 480px; background: var(--card); border-radius: 24px 24px 0 0; padding: 20px 16px calc(16px + env(safe-area-inset-bottom)); animation: up .18s ease-out; }
+  @keyframes up { from { transform: translateY(40px); } }
+  .sheet .mode-tag { display: inline-block; padding: 4px 10px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 12px; font-weight: 700; }
+  .sheet .name { font-size: 20px; font-weight: 700; margin: 10px 0 2px; }
+  .sheet .sku { color: var(--muted); font-size: 14px; }
+  .sheet .q-label { margin: 20px 0 8px; font-size: 13px; font-weight: 600; color: var(--muted); }
+  .stepper { display: grid; grid-template-columns: 64px 1fr 64px; gap: 8px; }
+  .stepper button { height: 64px; border-radius: 16px; background: var(--bg); font-size: 28px; font-weight: 700; }
+  .stepper input { height: 64px; width: 100%; min-width: 0; border: 2px solid var(--line); border-radius: 16px; text-align: center; font-family: inherit; font-size: 30px; font-weight: 700; color: var(--text); background: var(--card); -moz-appearance: textfield; }
+  .stepper input:focus { outline: none; border-color: var(--accent); }
+  .stepper input::-webkit-outer-spin-button, .stepper input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .preview { margin-top: 12px; padding: 12px 14px; border-radius: 14px; background: var(--accent-soft); font-size: 15px; display: flex; justify-content: space-between; }
+  .preview b { font-size: 18px; }
+  .preview.bad { background: var(--out-soft); color: #8a1f1f; }
+  .actions { display: grid; grid-template-columns: 1fr 2fr; gap: 8px; margin-top: 16px; }
+  .actions button { height: 56px; border-radius: 16px; font-weight: 700; font-size: 17px; }
+  .actions .cancel { background: var(--bg); }
+  .actions .save { background: var(--accent); color: #fff; }
+  .actions .save:disabled { opacity: .4; }
+
+  .cam { position: relative; aspect-ratio: 4 / 3; border-radius: 20px; overflow: hidden; background: #111; }
   #reader, #reader video { position: absolute !important; inset: 0; width: 100% !important; height: 100% !important; object-fit: cover; border: 0 !important; }
   #reader img, #reader__dashboard, #reader__header_message { display: none !important; }
-  .frame { position: absolute; left: 10%; right: 10%; top: 32%; bottom: 32%; border: 3px solid var(--accent); border-radius: 14px; box-shadow: 0 0 0 999px rgba(0,0,0,.35); pointer-events: none; }
+  .frame { position: absolute; left: 10%; right: 10%; top: 30%; bottom: 30%; border: 3px solid var(--accent); border-radius: 14px; box-shadow: 0 0 0 999px rgba(0,0,0,.35); pointer-events: none; }
   .laser { position: absolute; left: 6%; right: 6%; top: 50%; height: 2px; background: var(--accent); opacity: .8; animation: sweep 1.6s ease-in-out infinite; }
   @keyframes sweep { 0%,100% { transform: translateY(-14px); } 50% { transform: translateY(14px); } }
-  .pill { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); padding: 6px 14px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 13px; font-weight: 700; letter-spacing: .04em; white-space: nowrap; }
+  .pill { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); padding: 6px 14px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 13px; font-weight: 700; white-space: nowrap; }
   .cam-msg { position: absolute; inset: 0; display: flex; flex-direction: column; gap: 12px; align-items: center; justify-content: center; color: #fff; text-align: center; padding: 24px; background: #111; }
   .cam-msg button { background: #fff; color: #111; padding: 12px 22px; border-radius: 999px; font-weight: 700; }
   .flash { position: absolute; inset: 0; background: var(--accent); opacity: 0; pointer-events: none; transition: opacity .35s; }
   .flash.err { background: #000; }
   .flash.on { opacity: .55; transition: none; }
 
-  .qty { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 8px 8px 8px 16px; }
-  .qty span { color: var(--muted); font-size: 14px; }
-  .stepper { display: flex; align-items: center; gap: 4px; }
-  .stepper button { width: 44px; height: 44px; border-radius: 12px; background: var(--bg); font-size: 22px; font-weight: 700; }
-  .stepper output { min-width: 44px; text-align: center; font-size: 20px; font-weight: 700; }
+  .last { border-radius: 16px; padding: 16px; background: var(--card); border: 1px solid var(--line); }
+  .last.idle { color: var(--muted); text-align: center; padding: 22px 16px; }
+  .last.ok { background: var(--accent-soft); border-color: transparent; }
+  .last.err { background: var(--out-soft); border-color: transparent; color: #8a1f1f; font-weight: 600; }
+  .last .row { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+  .last .name { font-weight: 700; font-size: 18px; }
+  .last .sku { color: var(--muted); font-size: 13px; }
+  .badge { padding: 4px 10px; border-radius: 999px; font-weight: 800; font-size: 16px; color: #fff; background: var(--in); white-space: nowrap; }
+  .badge.minus { background: var(--out); }
+  .last .stock { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 12px; }
+  .last .stock span { font-size: 13px; color: var(--muted); display: block; }
+  .last .stock b { font-size: 32px; line-height: 1; }
+  .undo { padding: 10px 14px; border-radius: 12px; background: rgba(0,0,0,.06); font-size: 14px; font-weight: 600; }
+  .undone { font-size: 13px; color: var(--muted); margin-top: 8px; }
 
-  .result { margin-top: 12px; border-radius: 16px; padding: 16px; background: var(--card); border: 1px solid var(--line); min-height: 96px; }
-  .result.ok { background: var(--accent-soft); border-color: transparent; }
-  .result.err { background: #fbe6e3; border-color: transparent; color: #8a1f1f; }
-  .result .top { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
-  .result .name { font-weight: 700; font-size: 17px; }
-  .result .sku { color: var(--muted); font-size: 13px; }
-  .result .delta { font-weight: 800; font-size: 20px; color: var(--accent); }
-  .result .stock { margin-top: 6px; font-size: 14px; color: var(--muted); }
-  .result .stock b { font-size: 30px; color: var(--text); }
-  .result.idle { color: var(--muted); display: flex; align-items: center; }
-
-  .section { display: flex; justify-content: space-between; align-items: center; margin: 20px 0 8px; }
-  .section h2 { font-size: 15px; margin: 0; color: var(--muted); font-weight: 600; }
-  .link { color: var(--muted); font-size: 14px; text-decoration: underline; }
   ul.history { list-style: none; margin: 0; padding: 0; background: var(--card); border-radius: 16px; border: 1px solid var(--line); overflow: hidden; }
-  ul.history li { display: flex; justify-content: space-between; padding: 12px 16px; border-top: 1px solid var(--line); font-size: 14px; }
+  ul.history li { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; padding: 12px 16px; border-top: 1px solid var(--line); }
   ul.history li:first-child { border-top: 0; }
-  ul.history .p { color: var(--in); font-weight: 700; }
-  ul.history .m { color: var(--out); font-weight: 700; }
-  ul.history .empty { color: var(--muted); justify-content: center; }
+  ul.history .n { font-weight: 600; font-size: 15px; }
+  ul.history .t { font-size: 12px; color: var(--muted); }
+  ul.history .c { grid-row: span 2; align-self: center; text-align: right; font-size: 13px; color: var(--muted); }
+  ul.history .c b { display: block; font-size: 16px; }
+  ul.history .p b { color: var(--in); }
+  ul.history .m b { color: var(--out); }
 
-  #labels .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  #labels .label { background: #fff; padding: 8px; text-align: center; border-radius: 10px; border: 1px dashed #c9c8c2; font-size: 12px; break-inside: avoid; }
-  #labels svg { max-width: 100%; height: auto; }
-  .primary { width: 100%; margin-top: 12px; padding: 14px; border-radius: 14px; background: var(--text); color: #fff; font-weight: 700; }
+  .gate { min-height: 100vh; min-height: 100dvh; display: flex; align-items: center; justify-content: center; padding: 24px 16px; }
+  .gate-card { width: 100%; max-width: 380px; background: var(--card); border: 1px solid var(--line); border-radius: 24px; padding: 32px 24px; text-align: center; }
+  .gate-icon { width: 64px; height: 64px; margin: 0 auto 16px; border-radius: 18px; display: grid; place-items: center; background: var(--in-soft); color: var(--in); }
+  .gate-icon svg { width: 32px; height: 32px; }
+  .gate.bad .gate-icon { background: var(--out-soft); color: var(--out); }
+  .gate .brand { font-size: 13px; font-weight: 600; color: var(--muted); letter-spacing: .02em; }
+  .gate h2 { font-size: 22px; margin: 4px 0 8px; }
+  .gate p { color: var(--muted); margin: 0; }
+  .steps { text-align: left; margin: 20px 0 0; padding: 16px; background: var(--bg); border-radius: 14px; font-size: 14px; color: var(--text); list-style: none; counter-reset: s; }
+  .steps li { counter-increment: s; display: flex; gap: 10px; padding: 4px 0; }
+  .steps li::before { content: counter(s); flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%; background: var(--text); color: #fff; font-size: 12px; font-weight: 700; display: grid; place-items: center; }
+  .gate .retry { margin-top: 20px; width: 100%; padding: 14px; border-radius: 14px; background: var(--text); color: #fff; font-weight: 700; }
+  .spinner { width: 28px; height: 28px; border: 3px solid var(--in-soft); border-top-color: var(--in); border-radius: 50%; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .me { cursor: pointer; }
+  .menu { position: absolute; right: 16px; top: 52px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 6px; box-shadow: 0 8px 24px rgba(0,0,0,.12); }
+  .menu button { display: block; width: 100%; text-align: left; padding: 10px 14px; border-radius: 10px; font-size: 15px; color: var(--out); font-weight: 600; }
   .hidden { display: none !important; }
-  @media print { header, .noprint { display: none !important; } body { background: #fff; } #labels .grid { grid-template-columns: repeat(3, 1fr); } }
 </style>
 </head>
 <body class="IN">
-<div class="app">
 
-  <section id="gate" class="gate hidden">
-    <h1>Stock Scanner</h1>
-    <p id="gateText">Open your personal setup link to sign in on this phone.</p>
-  </section>
+<section id="gate" class="gate hidden">
+  <div class="gate-card">
+    <div class="gate-icon" id="gateIcon"></div>
+    <div class="brand">STOCK SCANNER</div>
+    <h2 id="gateTitle"></h2>
+    <p id="gateText"></p>
+    <ol class="steps hidden" id="gateSteps">
+      <li>Minta link login pribadi ke atasan Anda</li>
+      <li>Buka link tersebut di HP ini</li>
+      <li>Setelah itu Anda akan tetap masuk</li>
+    </ol>
+    <button class="retry hidden" id="gateRetry" onclick="init()">Coba lagi</button>
+  </div>
+</section>
 
-  <section id="scanView" class="hidden">
-    <header>
-      <div>
-        <h1>Stock Scanner</h1>
-        <div class="who">Signed in as <b id="userName">…</b></div>
+<div id="scanView" class="hidden">
+  <header class="topbar">
+    <div class="wrap">
+      <h1>Stock Scanner</h1>
+      <div class="me" onclick="toggleMenu()"><b id="userName">…</b><div class="avatar" id="avatar">?</div></div>
+    </div>
+    <div class="menu hidden" id="menu"><button onclick="signOut()">Keluar dari HP ini</button></div>
+  </header>
+
+  <main class="wrap">
+    <div class="block">
+      <p class="label">1. Pilih jenis transaksi</p>
+      <div class="seg">
+        <button class="in active" onclick="setMode('IN')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v10M8 9l4 4 4-4"/><path d="M4 14v5a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-5"/></svg> Barang Masuk</button>
+        <button class="out" onclick="setMode('OUT')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 13V3M8 7l4-4 4 4"/><path d="M4 14v5a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-5"/></svg> Barang Keluar</button>
       </div>
-      <button class="icon-btn" onclick="show('labels')">Labels</button>
-    </header>
-
-    <div class="seg">
-      <button class="in active" onclick="setMode('IN')">＋ Stock In</button>
-      <button class="out" onclick="setMode('OUT')">− Stock Out</button>
     </div>
 
-    <div class="cam">
-      <div id="reader"></div>
-      <div class="frame"><div class="laser"></div></div>
-      <div class="pill" id="pill">STOCK IN</div>
-      <div class="flash" id="flash"></div>
-      <div class="cam-msg" id="camMsg">
-        <div id="camText">Camera is off</div>
-        <button onclick="startCamera()">Start camera</button>
+    <div class="block">
+      <p class="label">2. Scan barcode, lalu isi jumlahnya</p>
+      <div class="cam">
+        <div id="reader"></div>
+        <div class="frame"><div class="laser"></div></div>
+        <div class="pill" id="pill">BARANG MASUK</div>
+        <div class="flash" id="flash"></div>
+        <div class="cam-msg" id="camMsg">
+          <div id="camText">Kamera mati</div>
+          <button onclick="startCamera()">Nyalakan kamera</button>
+        </div>
       </div>
     </div>
 
-    <div class="qty">
-      <span>Quantity per scan</span>
+    <div class="block">
+      <p class="label">Scan terakhir</p>
+      <div class="last idle" id="last">Belum ada yang di-scan</div>
+    </div>
+
+    <div class="block hidden" id="earlierBlock">
+      <p class="label">Scan sebelumnya</p>
+      <ul class="history" id="history"></ul>
+    </div>
+  </main>
+
+  <div class="sheet-bg hidden" id="sheet" onclick="if (event.target === this) closeSheet()">
+    <div class="sheet" role="dialog" aria-modal="true">
+      <span class="mode-tag" id="sTag"></span>
+      <div class="name" id="sName"></div>
+      <div class="sku" id="sSku"></div>
+      <div class="q-label" id="sLabel"></div>
       <div class="stepper">
-        <button onclick="step(-1)" aria-label="Decrease">−</button>
-        <output id="amount">1</output>
-        <button onclick="step(1)" aria-label="Increase">＋</button>
+        <button onclick="step(-1)" aria-label="Kurangi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"/></svg></button>
+        <input id="amount" type="number" inputmode="numeric" pattern="[0-9]*" min="1" value="1" oninput="updatePreview()" onfocus="this.select()" aria-label="Jumlah">
+        <button onclick="step(1)" aria-label="Tambah"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+      </div>
+      <div class="preview" id="sPreview"></div>
+      <div class="actions">
+        <button class="cancel" onclick="closeSheet()">Batal</button>
+        <button class="save" id="sSave" onclick="save()"></button>
       </div>
     </div>
-
-    <div class="result idle" id="result">Point the camera at a barcode</div>
-
-    <div class="section">
-      <h2>Recent scans</h2>
-      <button class="link" onclick="undo()">Undo last</button>
-    </div>
-    <ul class="history" id="history"><li class="empty">No scans yet</li></ul>
-  </section>
-
-  <section id="labels" class="hidden">
-    <header>
-      <h1>Barcode labels</h1>
-      <button class="icon-btn noprint" onclick="show('scanView')">Back</button>
-    </header>
-    <div class="grid" id="labelGrid">Loading…</div>
-    <button class="primary noprint" onclick="window.print()">Print labels</button>
-  </section>
-
+  </div>
 </div>
+
 <script>
   // The Apps Script web app (deployed with access "Anyone").
   const API_URL = 'https://script.google.com/macros/s/AKfycbwzPja6TnpNO0Q5UMP60WtNyEH1D6bfFYKMwaRfvg3mAq9s24LPPq_DyuWlA0hZwJ0VsA/exec';
 
-  let mode = 'IN', amount = 1, busy = false, cam = null, camOn = false, key = '';
+  let mode = 'IN', busy = false, cam = null, camOn = false, key = '';
+  let lastScan = null, pending = null;
   const $ = id => document.getElementById(id);
   let audio;
 
@@ -180,31 +237,59 @@
       body: JSON.stringify(Object.assign({ key, action }, data)),
     });
     const out = await res.json();
-    if (out.denied) { store('stockKey', null); gate(out.message); throw new Error(out.message); }
+    if (out.denied) { store('stockKey', null); gate('denied'); throw new Error(out.message); }
     return out;
   }
 
-  function gate(text) {
+  const ICONS = {
+    scan: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M8 9v6M11 9v6M14 9v6M17 9v6"/></svg>',
+    lock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>',
+    offline: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 3l18 18M8.5 16.5a5 5 0 0 1 7 0M5 13a10 10 0 0 1 5-2.7M14 10.3A10 10 0 0 1 19 13M12 20h.01"/></svg>',
+    spin: '<div class="spinner"></div>',
+  };
+
+  // kind: 'loading' | 'nokey' | 'denied' | 'error'
+  function gate(kind, detail) {
     if (camOn) { cam.stop(); camOn = false; }
+    const v = {
+      loading: ['spin', 'Sedang masuk…', 'Tunggu sebentar.'],
+      nokey: ['scan', 'Masuk untuk mulai scan', 'HP ini belum terdaftar.'],
+      denied: ['lock', 'Link tidak berlaku lagi', 'Link ini mungkin sudah dinonaktifkan atau diganti. Minta link login baru ke atasan Anda.'],
+      error: ['offline', 'Tidak dapat terhubung', 'Periksa koneksi internet Anda, lalu coba lagi.'],
+    }[kind];
     $('scanView').classList.add('hidden');
-    $('labels').classList.add('hidden');
     $('gate').classList.remove('hidden');
-    $('gateText').textContent = text;
+    $('gate').classList.toggle('bad', kind === 'denied' || kind === 'error');
+    $('gateIcon').innerHTML = ICONS[v[0]];
+    $('gateTitle').textContent = v[1];
+    $('gateText').textContent = detail || v[2];
+    $('gateSteps').classList.toggle('hidden', kind !== 'nokey' && kind !== 'denied');
+    $('gateRetry').classList.toggle('hidden', kind !== 'error');
+  }
+
+  function toggleMenu() { $('menu').classList.toggle('hidden'); }
+
+  function signOut() {
+    if (!confirm('Keluar dari HP ini? Anda perlu membuka link login lagi untuk masuk.')) return;
+    store('stockKey', null);
+    key = '';
+    $('menu').classList.add('hidden');
+    gate('nokey');
   }
 
   async function init() {
     key = readKey();
-    if (!key) return gate('Open your personal setup link to sign in on this phone.');
-    $('gate').classList.remove('hidden');
-    $('gateText').textContent = 'Signing in…';
+    if (!key) return gate('nokey');
+    gate('loading');
     try {
       const me = await api('whoami');
       $('userName').textContent = me.user;
+      $('avatar').textContent = me.user.trim().charAt(0).toUpperCase();
       $('gate').classList.add('hidden');
       $('scanView').classList.remove('hidden');
       startCamera();
     } catch (err) {
-      if (key) gate('Could not reach the server: ' + err.message);
+      if (store('stockKey') || key) { if (!$('gate').classList.contains('bad')) gate('error'); }
     }
   }
 
@@ -229,18 +314,57 @@
     document.body.className = m;
     document.querySelector('.seg .in').classList.toggle('active', m === 'IN');
     document.querySelector('.seg .out').classList.toggle('active', m === 'OUT');
-    $('pill').textContent = m === 'IN' ? 'STOCK IN' : 'STOCK OUT';
+    $('pill').textContent = m === 'IN' ? 'BARANG MASUK' : 'BARANG KELUAR';
+  }
+
+  function amountValue() {
+    const n = parseInt($('amount').value, 10);
+    return Number.isFinite(n) ? n : 0;
   }
 
   function step(d) {
-    amount = Math.max(1, Math.min(999, amount + d));
-    $('amount').textContent = amount;
+    $('amount').value = Math.max(1, Math.min(9999, (amountValue() || 0) + d));
+    updatePreview();
+  }
+
+  // Shows the stock after saving and blocks amounts that are empty or more than what's in stock.
+  function updatePreview() {
+    if (!pending) return;
+    const n = amountValue();
+    const after = pending.qty + (mode === 'IN' ? n : -n);
+    const box = $('sPreview'), btn = $('sSave');
+    let bad = '';
+    if (n < 1) bad = 'Isi jumlah minimal 1';
+    else if (after < 0) bad = 'Stok tidak cukup (sisa ' + pending.qty + ')';
+    box.className = 'preview' + (bad ? ' bad' : '');
+    box.innerHTML = bad ? '' : 'Stok setelah ini <b>' + pending.qty + ' → ' + after + '</b>';
+    if (bad) box.textContent = bad;
+    btn.disabled = !!bad;
+    btn.textContent = n > 0 ? 'Simpan · ' + (mode === 'IN' ? 'Masuk ' : 'Keluar ') + n : 'Simpan';
+  }
+
+  function openSheet(product) {
+    pending = product;
+    $('sTag').textContent = mode === 'IN' ? 'BARANG MASUK' : 'BARANG KELUAR';
+    $('sName').textContent = product.name;
+    $('sSku').textContent = product.sku + ' · Stok sekarang: ' + product.qty;
+    $('sLabel').textContent = mode === 'IN' ? 'Jumlah masuk' : 'Jumlah keluar';
+    $('amount').value = 1;
+    updatePreview();
+    $('sheet').classList.remove('hidden');
+  }
+
+  function closeSheet() {
+    $('amount').blur();
+    $('sheet').classList.add('hidden');
+    pending = null;
+    resume();
   }
 
   function startCamera() {
     if (camOn) return;
     $('camMsg').classList.remove('hidden');
-    $('camText').textContent = 'Starting camera…';
+    $('camText').textContent = 'Menyalakan kamera…';
     const F = Html5QrcodeSupportedFormats;
     cam = cam || new Html5Qrcode('reader', {
       formatsToSupport: [F.CODE_128, F.CODE_39, F.EAN_13, F.EAN_8, F.UPC_A, F.UPC_E, F.QR_CODE],
@@ -252,7 +376,7 @@
       $('camMsg').classList.add('hidden');
     }).catch(err => {
       $('camMsg').classList.remove('hidden');
-      $('camText').textContent = 'Camera unavailable: ' + err;
+      $('camText').textContent = 'Kamera tidak tersedia: ' + err;
     });
   }
 
@@ -264,86 +388,120 @@
   }
 
   function resume() {
-    setTimeout(() => { try { cam && camOn && cam.resume(); } catch (e) {} }, 900);
+    setTimeout(() => { try { if (cam && camOn && !pending) cam.resume(); } catch (e) {} }, 900);
   }
 
-  function render(res) {
-    beep(res.ok);
-    const r = $('result');
-    if (!res.ok) {
-      r.className = 'result err';
-      r.textContent = res.message;
-      return;
-    }
-    const sign = res.change > 0 ? '+' : '';
-    r.className = 'result ok';
-    r.innerHTML = '';
-    r.insertAdjacentHTML('beforeend',
-      `<div class="top"><div><div class="name"></div><div class="sku"></div></div><div class="delta">${sign}${res.change}</div></div>` +
-      `<div class="stock">Stock now <b>${res.qty}</b></div>`);
-    r.querySelector('.name').textContent = res.name;
-    r.querySelector('.sku').textContent = res.sku;
+  function time() {
+    return new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+  }
 
-    const h = $('history');
-    const empty = h.querySelector('.empty');
-    if (empty) empty.remove();
+  function fmt(change) {
+    return (change > 0 ? 'Masuk ' : 'Keluar ') + Math.abs(change);
+  }
+
+  // Moves the previous "last scan" into the Earlier list.
+  function pushEarlier(s) {
     const li = document.createElement('li');
-    li.innerHTML = `<span></span><span class="${res.change > 0 ? 'p' : 'm'}">${sign}${res.change} → ${res.qty}</span>`;
-    li.firstChild.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + '  ' + res.name;
-    h.prepend(li);
-    while (h.children.length > 8) h.lastChild.remove();
+    li.innerHTML = '<span class="n"></span><span class="c"><b></b></span><span class="t"></span>';
+    li.querySelector('.n').textContent = s.name;
+    li.querySelector('.t').textContent = s.time + (s.undone ? ' · dibatalkan' : '');
+    li.querySelector('.c').className = 'c ' + (s.change > 0 ? 'p' : 'm');
+    li.querySelector('.c b').textContent = s.undone ? 'batal' : fmt(s.change);
+    li.querySelector('.c').append('stok ' + s.qty);
+    $('history').prepend(li);
+    while ($('history').children.length > 10) $('history').lastChild.remove();
+    $('earlierBlock').classList.remove('hidden');
   }
 
-  function fail(err) {
-    render({ ok: false, message: 'Error: ' + (err && err.message || err) });
+  function showLast(s) {
+    const box = $('last');
+    box.className = 'last ok';
+    box.innerHTML =
+      '<div class="row"><div><div class="name"></div><div class="sku"></div></div><div class="badge"></div></div>' +
+      '<div class="stock"><div><span>Stok sekarang</span><b></b></div><button class="undo" onclick="undo()">Batalkan</button></div>';
+    box.querySelector('.name').textContent = s.name;
+    box.querySelector('.sku').textContent = s.sku + ' · ' + s.time;
+    box.querySelector('.badge').textContent = fmt(s.change);
+    box.querySelector('.badge').classList.toggle('minus', s.change < 0);
+    box.querySelector('.stock b').textContent = s.qty;
+    if (s.undone) {
+      box.querySelector('.undo').remove();
+      box.insertAdjacentHTML('beforeend', '<div class="undone">Scan ini sudah dibatalkan.</div>');
+    }
+  }
+
+  function showError(message) {
+    beep(false);
+    const box = $('last');
+    box.className = 'last err';
+    box.textContent = message;
+    // An error replaces the card, so keep the previous scan visible in the list.
+    if (lastScan) { pushEarlier(lastScan); lastScan = null; }
   }
 
   async function submit(sku) {
     if (!sku || busy) return;
     busy = true;
-    const r = $('result');
-    r.className = 'result idle';
-    r.textContent = 'Saving ' + sku + '…';
-    try { render(await api('scan', { sku, mode, amount })); } catch (err) { fail(err); }
+    const box = $('last');
+    const before = { className: box.className, html: box.innerHTML };
+    box.className = 'last idle';
+    box.textContent = 'Mencari ' + sku + '…';
+    try {
+      const res = await api('lookup', { sku });
+      if (!res.ok) { showError(res.message); busy = false; resume(); return; }
+      beep(true);
+      box.className = before.className;
+      box.innerHTML = before.html;
+      openSheet(res);
+    } catch (err) {
+      showError('Gagal: ' + err.message);
+      resume();
+    }
+    busy = false;
+  }
+
+  async function save() {
+    if (busy || !pending) return;
+    const amount = amountValue();
+    if (amount < 1) return;
+    busy = true;
+    $('sSave').disabled = true;
+    $('sSave').textContent = 'Menyimpan…';
+    try {
+      const res = await api('scan', { sku: pending.sku, mode, amount });
+      $('sheet').classList.add('hidden');
+      pending = null;
+      if (!res.ok) showError(res.message);
+      else {
+        if (lastScan) pushEarlier(lastScan);
+        lastScan = { sku: res.sku, name: res.name, qty: res.qty, change: res.change, time: time() };
+        showLast(lastScan);
+      }
+    } catch (err) {
+      $('sheet').classList.add('hidden');
+      pending = null;
+      showError('Gagal: ' + err.message);
+    }
     busy = false;
     resume();
   }
 
   async function undo() {
-    if (busy || !confirm('Undo your last scan?')) return;
+    if (busy || !lastScan || !confirm('Batalkan scan ini?')) return;
     busy = true;
-    try { render(await api('undo')); } catch (err) { fail(err); }
-    busy = false;
-  }
-
-  function show(id) {
-    $('scanView').classList.toggle('hidden', id !== 'scanView');
-    $('labels').classList.toggle('hidden', id !== 'labels');
-    if (id === 'labels') {
-      if (camOn) { cam.stop(); camOn = false; }
-      loadLabels();
-    } else {
-      startCamera();
-    }
-  }
-
-  async function loadLabels() {
-    const grid = $('labelGrid');
-    grid.textContent = 'Loading…';
     try {
-      const { items } = await api('products');
-      grid.innerHTML = '';
-      if (!items.length) { grid.textContent = 'No products yet.'; return; }
-      items.forEach(p => {
-        const div = document.createElement('div');
-        div.className = 'label';
-        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-        div.appendChild(svg);
-        div.appendChild(document.createTextNode(p.name));
-        grid.appendChild(div);
-        JsBarcode(svg, p.sku, { format: 'CODE128', height: 50, fontSize: 14, margin: 4 });
-      });
-    } catch (err) { grid.textContent = 'Error: ' + err.message; }
+      const res = await api('undo');
+      if (!res.ok) showError(res.message);
+      else {
+        beep(true);
+        lastScan.undone = true;
+        lastScan.qty = res.qty;
+        showLast(lastScan);
+      }
+    } catch (err) {
+      showError('Gagal: ' + err.message);
+    }
+    busy = false;
   }
 
   init();
