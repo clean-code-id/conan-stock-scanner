@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Stock Scanner</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<script>
+  // Show script errors on the page so problems on a phone are visible.
+  window.onerror = function (msg, src, line) {
+    const d = document.createElement('div');
+    d.style.cssText = 'background:#fbe3e3;color:#8a1f1f;padding:10px;margin:8px;border-radius:8px;font:13px monospace';
+    d.textContent = 'Error: ' + msg + ' (line ' + line + ')';
+    (document.body || document.documentElement).prepend(d);
+  };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+  :root {
+    --bg: #f4f4f1; --card: #fff; --text: #1c1c1a; --muted: #6b6b66; --line: #e4e3de;
+    --in: #1f8a4c; --in-soft: #e3f4ea; --out: #d0402f; --out-soft: #fbe6e3;
+    --accent: var(--in); --accent-soft: var(--in-soft);
+  }
+  body.OUT { --accent: var(--out); --accent-soft: var(--out-soft); }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.4 -apple-system, system-ui, sans-serif; }
+  .app { max-width: 480px; margin: 0 auto; padding: 12px 16px calc(24px + env(safe-area-inset-bottom)); }
+  button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+
+  header { display: flex; align-items: center; justify-content: space-between; padding: 4px 0 12px; }
+  header h1 { font-size: 20px; margin: 0; font-weight: 700; }
+  .who { font-size: 13px; color: var(--muted); margin-top: 2px; }
+  .who b { color: var(--in); }
+  .gate { text-align: center; padding: 48px 8px; color: var(--muted); }
+  .gate h1 { color: var(--text); font-size: 22px; margin-bottom: 8px; }
+  .icon-btn { padding: 8px 12px; border-radius: 999px; background: var(--card); border: 1px solid var(--line); font-size: 14px; }
+
+  .seg { display: grid; grid-template-columns: 1fr 1fr; background: #e7e6e1; border-radius: 16px; padding: 4px; }
+  .seg button { padding: 14px 0; border-radius: 12px; font-weight: 700; font-size: 17px; color: var(--muted); transition: .15s; }
+  .seg button.active.in { background: var(--in); color: #fff; }
+  .seg button.active.out { background: var(--out); color: #fff; }
+
+  .cam { position: relative; margin-top: 12px; aspect-ratio: 1 / 1; border-radius: 20px; overflow: hidden; background: #111; }
+  #reader, #reader video { position: absolute !important; inset: 0; width: 100% !important; height: 100% !important; object-fit: cover; border: 0 !important; }
+  #reader img, #reader__dashboard, #reader__header_message { display: none !important; }
+  .frame { position: absolute; left: 10%; right: 10%; top: 32%; bottom: 32%; border: 3px solid var(--accent); border-radius: 14px; box-shadow: 0 0 0 999px rgba(0,0,0,.35); pointer-events: none; }
+  .laser { position: absolute; left: 6%; right: 6%; top: 50%; height: 2px; background: var(--accent); opacity: .8; animation: sweep 1.6s ease-in-out infinite; }
+  @keyframes sweep { 0%,100% { transform: translateY(-14px); } 50% { transform: translateY(14px); } }
+  .pill { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); padding: 6px 14px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 13px; font-weight: 700; letter-spacing: .04em; white-space: nowrap; }
+  .cam-msg { position: absolute; inset: 0; display: flex; flex-direction: column; gap: 12px; align-items: center; justify-content: center; color: #fff; text-align: center; padding: 24px; background: #111; }
+  .cam-msg button { background: #fff; color: #111; padding: 12px 22px; border-radius: 999px; font-weight: 700; }
+  .flash { position: absolute; inset: 0; background: var(--accent); opacity: 0; pointer-events: none; transition: opacity .35s; }
+  .flash.err { background: #000; }
+  .flash.on { opacity: .55; transition: none; }
+
+  .qty { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 8px 8px 8px 16px; }
+  .qty span { color: var(--muted); font-size: 14px; }
+  .stepper { display: flex; align-items: center; gap: 4px; }
+  .stepper button { width: 44px; height: 44px; border-radius: 12px; background: var(--bg); font-size: 22px; font-weight: 700; }
+  .stepper output { min-width: 44px; text-align: center; font-size: 20px; font-weight: 700; }
+
+  .result { margin-top: 12px; border-radius: 16px; padding: 16px; background: var(--card); border: 1px solid var(--line); min-height: 96px; }
+  .result.ok { background: var(--accent-soft); border-color: transparent; }
+  .result.err { background: #fbe6e3; border-color: transparent; color: #8a1f1f; }
+  .result .top { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+  .result .name { font-weight: 700; font-size: 17px; }
+  .result .sku { color: var(--muted); font-size: 13px; }
+  .result .delta { font-weight: 800; font-size: 20px; color: var(--accent); }
+  .result .stock { margin-top: 6px; font-size: 14px; color: var(--muted); }
+  .result .stock b { font-size: 30px; color: var(--text); }
+  .result.idle { color: var(--muted); display: flex; align-items: center; }
+
+  .section { display: flex; justify-content: space-between; align-items: center; margin: 20px 0 8px; }
+  .section h2 { font-size: 15px; margin: 0; color: var(--muted); font-weight: 600; }
+  .link { color: var(--muted); font-size: 14px; text-decoration: underline; }
+  ul.history { list-style: none; margin: 0; padding: 0; background: var(--card); border-radius: 16px; border: 1px solid var(--line); overflow: hidden; }
+  ul.history li { display: flex; justify-content: space-between; padding: 12px 16px; border-top: 1px solid var(--line); font-size: 14px; }
+  ul.history li:first-child { border-top: 0; }
+  ul.history .p { color: var(--in); font-weight: 700; }
+  ul.history .m { color: var(--out); font-weight: 700; }
+  ul.history .empty { color: var(--muted); justify-content: center; }
+
+  #labels .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  #labels .label { background: #fff; padding: 8px; text-align: center; border-radius: 10px; border: 1px dashed #c9c8c2; font-size: 12px; break-inside: avoid; }
+  #labels svg { max-width: 100%; height: auto; }
+  .primary { width: 100%; margin-top: 12px; padding: 14px; border-radius: 14px; background: var(--text); color: #fff; font-weight: 700; }
+  .hidden { display: none !important; }
+  @media print { header, .noprint { display: none !important; } body { background: #fff; } #labels .grid { grid-template-columns: repeat(3, 1fr); } }
+</style>
+</head>
+<body class="IN">
+<div class="app">
+
+  <section id="gate" class="gate hidden">
+    <h1>Stock Scanner</h1>
+    <p id="gateText">Open your personal setup link to sign in on this phone.</p>
+  </section>
+
+  <section id="scanView" class="hidden">
+    <header>
+      <div>
+        <h1>Stock Scanner</h1>
+        <div class="who">Signed in as <b id="userName">…</b></div>
+      </div>
+      <button class="icon-btn" onclick="show('labels')">Labels</button>
+    </header>
+
+    <div class="seg">
+      <button class="in active" onclick="setMode('IN')">＋ Stock In</button>
+      <button class="out" onclick="setMode('OUT')">− Stock Out</button>
+    </div>
+
+    <div class="cam">
+      <div id="reader"></div>
+      <div class="frame"><div class="laser"></div></div>
+      <div class="pill" id="pill">STOCK IN</div>
+      <div class="flash" id="flash"></div>
+      <div class="cam-msg" id="camMsg">
+        <div id="camText">Camera is off</div>
+        <button onclick="startCamera()">Start camera</button>
+      </div>
+    </div>
+
+    <div class="qty">
+      <span>Quantity per scan</span>
+      <div class="stepper">
+        <button onclick="step(-1)" aria-label="Decrease">−</button>
+        <output id="amount">1</output>
+        <button onclick="step(1)" aria-label="Increase">＋</button>
+      </div>
+    </div>
+
+    <div class="result idle" id="result">Point the camera at a barcode</div>
+
+    <div class="section">
+      <h2>Recent scans</h2>
+      <button class="link" onclick="undo()">Undo last</button>
+    </div>
+    <ul class="history" id="history"><li class="empty">No scans yet</li></ul>
+  </section>
+
+  <section id="labels" class="hidden">
+    <header>
+      <h1>Barcode labels</h1>
+      <button class="icon-btn noprint" onclick="show('scanView')">Back</button>
+    </header>
+    <div class="grid" id="labelGrid">Loading…</div>
+    <button class="primary noprint" onclick="window.print()">Print labels</button>
+  </section>
+
+</div>
+<script>
+  // The Apps Script web app (deployed with access "Anyone").
+  const API_URL = 'https://script.google.com/macros/s/AKfycbwzPja6TnpNO0Q5UMP60WtNyEH1D6bfFYKMwaRfvg3mAq9s24LPPq_DyuWlA0hZwJ0VsA/exec';
+
+  let mode = 'IN', amount = 1, busy = false, cam = null, camOn = false, key = '';
+  const $ = id => document.getElementById(id);
+  let audio;
+
+  function store(k, v) {
+    try { if (v === undefined) return localStorage.getItem(k) || ''; v ? localStorage.setItem(k, v) : localStorage.removeItem(k); } catch (e) { return ''; }
+  }
+
+  // The setup link carries the key as #key=...; keep it on this phone and strip it from the address bar.
+  function readKey() {
+    const m = location.hash.match(/key=([0-9a-f]{32})/i);
+    if (m) {
+      store('stockKey', m[1].toLowerCase());
+      try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+      return m[1].toLowerCase();
+    }
+    return store('stockKey');
+  }
+
+  async function api(action, data) {
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      // text/plain keeps this a "simple" request, which Apps Script accepts cross-origin.
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(Object.assign({ key, action }, data)),
+    });
+    const out = await res.json();
+    if (out.denied) { store('stockKey', null); gate(out.message); throw new Error(out.message); }
+    return out;
+  }
+
+  function gate(text) {
+    if (camOn) { cam.stop(); camOn = false; }
+    $('scanView').classList.add('hidden');
+    $('labels').classList.add('hidden');
+    $('gate').classList.remove('hidden');
+    $('gateText').textContent = text;
+  }
+
+  async function init() {
+    key = readKey();
+    if (!key) return gate('Open your personal setup link to sign in on this phone.');
+    $('gate').classList.remove('hidden');
+    $('gateText').textContent = 'Signing in…';
+    try {
+      const me = await api('whoami');
+      $('userName').textContent = me.user;
+      $('gate').classList.add('hidden');
+      $('scanView').classList.remove('hidden');
+      startCamera();
+    } catch (err) {
+      if (key) gate('Could not reach the server: ' + err.message);
+    }
+  }
+
+  function beep(ok) {
+    try {
+      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+      const o = audio.createOscillator(), g = audio.createGain();
+      o.frequency.value = ok ? 1250 : 240;
+      g.gain.value = 0.2;
+      o.connect(g); g.connect(audio.destination);
+      o.start(); o.stop(audio.currentTime + (ok ? 0.12 : 0.45));
+    } catch (e) {}
+    if (navigator.vibrate) navigator.vibrate(ok ? 60 : [120, 60, 120]);
+    const f = $('flash');
+    f.classList.toggle('err', !ok);
+    f.classList.add('on');
+    setTimeout(() => f.classList.remove('on'), 60);
+  }
+
+  function setMode(m) {
+    mode = m;
+    document.body.className = m;
+    document.querySelector('.seg .in').classList.toggle('active', m === 'IN');
+    document.querySelector('.seg .out').classList.toggle('active', m === 'OUT');
+    $('pill').textContent = m === 'IN' ? 'STOCK IN' : 'STOCK OUT';
+  }
+
+  function step(d) {
+    amount = Math.max(1, Math.min(999, amount + d));
+    $('amount').textContent = amount;
+  }
+
+  function startCamera() {
+    if (camOn) return;
+    $('camMsg').classList.remove('hidden');
+    $('camText').textContent = 'Starting camera…';
+    const F = Html5QrcodeSupportedFormats;
+    cam = cam || new Html5Qrcode('reader', {
+      formatsToSupport: [F.CODE_128, F.CODE_39, F.EAN_13, F.EAN_8, F.UPC_A, F.UPC_E, F.QR_CODE],
+      experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+      verbose: false,
+    });
+    cam.start({ facingMode: 'environment' }, { fps: 12 }, onCode).then(() => {
+      camOn = true;
+      $('camMsg').classList.add('hidden');
+    }).catch(err => {
+      $('camMsg').classList.remove('hidden');
+      $('camText').textContent = 'Camera unavailable: ' + err;
+    });
+  }
+
+  function onCode(code) {
+    if (busy) return;
+    // Pause the camera while this scan is processed so one barcode counts once.
+    try { cam.pause(true); } catch (e) {}
+    submit(code.trim());
+  }
+
+  function resume() {
+    setTimeout(() => { try { cam && camOn && cam.resume(); } catch (e) {} }, 900);
+  }
+
+  function render(res) {
+    beep(res.ok);
+    const r = $('result');
+    if (!res.ok) {
+      r.className = 'result err';
+      r.textContent = res.message;
+      return;
+    }
+    const sign = res.change > 0 ? '+' : '';
+    r.className = 'result ok';
+    r.innerHTML = '';
+    r.insertAdjacentHTML('beforeend',
+      `<div class="top"><div><div class="name"></div><div class="sku"></div></div><div class="delta">${sign}${res.change}</div></div>` +
+      `<div class="stock">Stock now <b>${res.qty}</b></div>`);
+    r.querySelector('.name').textContent = res.name;
+    r.querySelector('.sku').textContent = res.sku;
+
+    const h = $('history');
+    const empty = h.querySelector('.empty');
+    if (empty) empty.remove();
+    const li = document.createElement('li');
+    li.innerHTML = `<span></span><span class="${res.change > 0 ? 'p' : 'm'}">${sign}${res.change} → ${res.qty}</span>`;
+    li.firstChild.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + '  ' + res.name;
+    h.prepend(li);
+    while (h.children.length > 8) h.lastChild.remove();
+  }
+
+  function fail(err) {
+    render({ ok: false, message: 'Error: ' + (err && err.message || err) });
+  }
+
+  async function submit(sku) {
+    if (!sku || busy) return;
+    busy = true;
+    const r = $('result');
+    r.className = 'result idle';
+    r.textContent = 'Saving ' + sku + '…';
+    try { render(await api('scan', { sku, mode, amount })); } catch (err) { fail(err); }
+    busy = false;
+    resume();
+  }
+
+  async function undo() {
+    if (busy || !confirm('Undo your last scan?')) return;
+    busy = true;
+    try { render(await api('undo')); } catch (err) { fail(err); }
+    busy = false;
+  }
+
+  function show(id) {
+    $('scanView').classList.toggle('hidden', id !== 'scanView');
+    $('labels').classList.toggle('hidden', id !== 'labels');
+    if (id === 'labels') {
+      if (camOn) { cam.stop(); camOn = false; }
+      loadLabels();
+    } else {
+      startCamera();
+    }
+  }
+
+  async function loadLabels() {
+    const grid = $('labelGrid');
+    grid.textContent = 'Loading…';
+    try {
+      const { items } = await api('products');
+      grid.innerHTML = '';
+      if (!items.length) { grid.textContent = 'No products yet.'; return; }
+      items.forEach(p => {
+        const div = document.createElement('div');
+        div.className = 'label';
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        div.appendChild(svg);
+        div.appendChild(document.createTextNode(p.name));
+        grid.appendChild(div);
+        JsBarcode(svg, p.sku, { format: 'CODE128', height: 50, fontSize: 14, margin: 4 });
+      });
+    } catch (err) { grid.textContent = 'Error: ' + err.message; }
+  }
+
+  init();
+</script>
+</body>
+</html>
