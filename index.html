@@ -134,7 +134,8 @@
   .spinner { width: 28px; height: 28px; border: 3px solid var(--in-soft); border-top-color: var(--in); border-radius: 50%; animation: spin .8s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
   .me { cursor: pointer; }
-  .menu { position: absolute; right: 16px; top: 52px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 6px; box-shadow: 0 8px 24px rgba(0,0,0,.12); }
+  .acct { position: relative; }
+  .menu { position: absolute; right: 0; top: calc(100% + 8px); white-space: nowrap; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 6px; box-shadow: 0 8px 24px rgba(0,0,0,.12); }
   .menu button { display: block; width: 100%; text-align: left; padding: 10px 14px; border-radius: 10px; font-size: 15px; color: var(--out); font-weight: 600; }
   .hidden { display: none !important; }
 
@@ -184,9 +185,11 @@
   <header class="topbar">
     <div class="wrap">
       <h1>Stock Scanner</h1>
-      <div class="me" onclick="toggleMenu()"><b id="userName">…</b><div class="avatar" id="avatar">?</div></div>
+      <div class="acct">
+        <div class="me" onclick="toggleMenu()"><b id="userName">…</b><div class="avatar" id="avatar">?</div></div>
+        <div class="menu hidden" id="menu"><button onclick="signOut()">Keluar dari HP ini</button></div>
+      </div>
     </div>
-    <div class="menu hidden" id="menu"><button onclick="signOut()">Keluar dari HP ini</button></div>
   </header>
 
   <main class="wrap">
@@ -334,6 +337,11 @@
   }
 
   function toggleMenu() { $('menu').classList.toggle('hidden'); }
+
+  // Close the account menu when tapping anywhere else.
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.acct')) $('menu').classList.add('hidden');
+  });
 
   function signOut() {
     if (!confirm('Keluar dari HP ini? Anda perlu membuka link login lagi untuk masuk.')) return;
