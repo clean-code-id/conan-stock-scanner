@@ -19,6 +19,7 @@ No servers. No database. No app store. Just a barcode scanner or phone camera, a
 | 🔎 **Physical scanner** | Scanner mode opens by default. Scan into the barcode field with a USB/Bluetooth keyboard scanner, then Enter opens the quantity dialog. Manual entry + **Cari** works too. |
 | 📷 **Camera scanning** | Choose **Kamera** to scan with your phone camera. Camera access is only requested when selected. |
 | ⬇️⬆️ **Barang Masuk / Keluar** | One tap to switch between stock in and stock out. |
+| 🆕 **Add products while receiving** | Unknown barcode in **Barang Masuk**? Enter its quantity and an optional name to add it to Products and record the stock-in. **Barang Keluar** only accepts existing products. |
 | 🔢 **Quantity after scan** | See the product and current stock first, then type how many. A preview shows the stock after saving. |
 | 🛡️ **Safe by default** | Can't take out more than you have. Wrong scan? Tap **Batal**. Saved by mistake? Tap **Batalkan**. |
 | 👤 **Know who did what** | Every staff member has a personal link. Every change in the log records their name. |
@@ -38,7 +39,7 @@ No servers. No database. No app store. Just a barcode scanner or phone camera, a
 ```
 
 - **The page** is one static HTML file hosted on GitHub Pages. It has no secrets in it.
-- **The API** is a Google Apps Script web app attached to the sheet. It is not in this repo.
+- **The API** is a Google Apps Script web app attached to the sheet. Its source is `Code.gs` in this workspace.
 - **The sheet** is the database, and stays private to its owner.
 
 ## Using a physical scanner
@@ -85,6 +86,14 @@ This is built to be **simple and good enough** for a small shop, not a bank.
 |---|---|
 | `index.html` (the page) | Commit and push to `main`. GitHub Pages updates in about a minute. |
 | `Code.gs` (the API, in Apps Script) | **Deploy → Manage deployments → Edit → New version → Deploy.** The URL stays the same. |
+
+### Deploying product creation
+
+Update the sheet's Apps Script project with `Code.gs`, then **Deploy → Manage deployments → Edit → New version → Deploy** using the existing deployment so its URL stays the same. Deploy the HTML page after the backend. Product creation requires the updated backend's `notFound` lookup response and `create` action; an older backend will keep showing the unknown-barcode error.
+
+All active staff can create products in **Barang Masuk**. Barcode becomes SKU; starting quantity is required and name is optional (left blank in both Products and Log when omitted). Cancelling writes nothing. Saving adds a Products row and an attributed IN Log row. Log names are fixed copies at transaction time; later product renames do not change older entries. Undo retains the original transaction name. Repeated creation requests return the existing product without adding stock; the form requires the quantity to be entered again before another stock addition. Undo reverses the stock-in and leaves the product registered with its remaining stock.
+
+Run backend checks locally with `node --test tests/create-product.test.cjs`.
 
 ## 🧱 Built with
 

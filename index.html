@@ -55,6 +55,10 @@
   .barcode-row input { min-width: 0; width: 100%; border: 2px solid var(--line); border-radius: 12px; padding: 12px; font: inherit; }
   .barcode-row input:focus { outline: none; border-color: var(--accent); }
   .barcode-row button { padding: 12px 16px; border-radius: 12px; background: var(--accent); color: #fff; font-weight: 700; }
+  .new-product { margin-top: 16px; }
+  .new-product label { display: block; font-weight: 600; font-size: 13px; margin-bottom: 8px; }
+  .new-product input { width: 100%; padding: 12px; border: 2px solid var(--line); border-radius: 12px; font: inherit; }
+  .new-product input:focus { outline-color: var(--accent); }
   .scanner-panel p { margin: 12px 0 0; color: var(--muted); font-size: 14px; }
 
   .sheet-bg { position: fixed; inset: 0; z-index: 20; background: rgba(0,0,0,.45); display: flex; align-items: flex-end; justify-content: center; }
@@ -258,6 +262,10 @@
       <span class="mode-tag" id="sTag"></span>
       <div class="name" id="sName"></div>
       <div class="sku" id="sSku"></div>
+      <div class="new-product hidden" id="newProductFields">
+        <label for="productName">Nama produk baru (opsional)</label>
+        <input id="productName" type="text" maxlength="200" placeholder="Boleh dikosongkan" autocomplete="off" oninput="updatePreview()">
+      </div>
       <div class="q-label" id="sLabel"></div>
       <div class="stepper">
         <button onclick="step(-1)" aria-label="Kurangi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"/></svg></button>
@@ -417,7 +425,7 @@
   }
 
   function amountValue() {
-    const n = parseInt($('amount').value, 10);
+    const n = Number($('amount').value);
     return Number.isFinite(n) ? n : 0;
   }
 
@@ -433,18 +441,20 @@
     const after = pending.qty + (mode === 'IN' ? n : -n);
     const box = $('sPreview'), btn = $('sSave');
     let bad = '';
-    if (n < 1) bad = 'Isi jumlah minimal 1';
+    if (!Number.isSafeInteger(n) || n < 1 || n > 9999) bad = 'Isi jumlah bulat antara 1 dan 9999';
     else if (after < 0) bad = 'Stok tidak cukup (sisa ' + pending.qty + ')';
     box.className = 'preview' + (bad ? ' bad' : '');
     box.innerHTML = bad ? '' : 'Stok setelah ini <b>' + pending.qty + ' → ' + after + '</b>';
     if (bad) box.textContent = bad;
     btn.disabled = !!bad;
-    btn.textContent = n > 0 ? 'Simpan · ' + (mode === 'IN' ? 'Masuk ' : 'Keluar ') + n : 'Simpan';
+    btn.textContent = n > 0 ? (pending.isNew ? 'Tambah produk · ' : 'Simpan · ') + (mode === 'IN' ? 'Masuk ' : 'Keluar ') + n : 'Simpan';
   }
 
   // Opens the sheet straight away with placeholders, so the scan feels instant while the lookup runs.
   function openSheetLoading(sku) {
     $('barcode').disabled = true;
+    $('newProductFields').classList.add('hidden');
+    $('productName').value = '';
     pending = null;
     retry = null;
     $('sheet').querySelector('.sheet').className = 'sheet loading';
@@ -467,9 +477,12 @@
     unsure = false;
     $('sheet').querySelector('.sheet').className = 'sheet';
     $('amount').disabled = false;
+    $('productName').disabled = false;
+    $('newProductFields').classList.toggle('hidden', !product.isNew);
+    $('productName').value = '';
     $('sTag').textContent = mode === 'IN' ? 'BARANG MASUK' : 'BARANG KELUAR';
-    $('sName').textContent = product.name;
-    $('sSku').textContent = product.sku + ' · Stok sekarang: ' + product.qty;
+    $('sName').textContent = product.isNew ? 'Tambah produk baru' : (product.name || product.sku);
+    $('sSku').textContent = product.sku + (product.isNew ? ' · Barcode belum terdaftar' : ' · Stok sekarang: ' + product.qty);
     $('sLabel').textContent = mode === 'IN' ? 'Jumlah masuk' : 'Jumlah keluar';
     $('amount').value = 1;
     updatePreview();
@@ -595,7 +608,7 @@
   function pushEarlier(s) {
     const li = document.createElement('li');
     li.innerHTML = '<span class="n"></span><span class="c"><b></b></span><span class="t"></span>';
-    li.querySelector('.n').textContent = s.name;
+    li.querySelector('.n').textContent = s.name || s.sku;
     li.querySelector('.t').textContent = s.time + (s.undone ? ' · dibatalkan' : '');
     li.querySelector('.c').className = 'c ' + (s.change > 0 ? 'p' : 'm');
     li.querySelector('.c b').textContent = s.undone ? 'batal' : fmt(s.change);
@@ -611,7 +624,7 @@
     box.innerHTML =
       '<div class="row"><div><div class="name"></div><div class="sku"></div></div><div class="badge"></div></div>' +
       '<div class="stock"><div><span>Stok sekarang</span><b></b></div><button class="undo" onclick="undo()">Batalkan</button></div>';
-    box.querySelector('.name').textContent = s.name;
+    box.querySelector('.name').textContent = s.name || s.sku;
     box.querySelector('.sku').textContent = s.sku + ' · ' + s.time;
     box.querySelector('.badge').textContent = fmt(s.change);
     box.querySelector('.badge').classList.toggle('minus', s.change < 0);
@@ -641,6 +654,7 @@
       const res = await api('lookup', { sku });
       if (id !== lookupId) return;
       if (res.ok) openSheet(res);
+      else if (mode === 'IN' && res.notFound) openSheet({ sku, name: '', qty: 0, isNew: true });
       else { hideSheet(); showError(res.message); resume(); }
     } catch (err) {
       if (id !== lookupId) return;
@@ -661,10 +675,13 @@
   async function save() {
     if (busy || !pending) return;
     const amount = amountValue();
-    if (amount < 1) return;
+    if (!Number.isSafeInteger(amount) || amount < 1 || amount > 9999) return;
+    const name = $('productName').value.trim();
+    if (pending.isNew && (name.length > 200 || mode !== 'IN')) return;
     busy = true;
     const sheet = $('sheet').querySelector('.sheet');
     sheet.classList.add('saving');
+    $('productName').disabled = true;
     $('amount').disabled = true;
     $('sSave').disabled = true;
     $('sSave').innerHTML = SPIN + 'Menyimpan…';
@@ -672,13 +689,27 @@
     try {
       let res = null;
       // The last try may have saved before the connection dropped; check the stock so it isn't counted twice.
-      if (unsure) {
+      if (unsure && !pending.isNew) {
         const now = await api('lookup', { sku: pending.sku });
         if (now.ok && now.qty === pending.qty + change) res = { ok: true, sku: now.sku, name: now.name, qty: now.qty, change };
       }
-      res = res || await api('scan', { sku: pending.sku, mode, amount });
+      res = res || await api(pending.isNew ? 'create' : 'scan', { sku: pending.sku, mode, amount, ...(pending.isNew ? { name } : {}) });
       sheet.classList.remove('saving');
       unsure = false;
+      if (!res.ok && pending.isNew) {
+        if (res.exists) {
+          openSheet(res);
+          $('amount').value = '';
+          updatePreview();
+          $('sSku').textContent += ' · ' + res.message;
+        } else {
+          $('amount').disabled = false;
+          $('productName').disabled = false;
+          sheetError(res.message, save);
+        }
+        busy = false;
+        return;
+      }
       hideSheet();
       if (!res.ok) showError(res.message);
       else {
@@ -691,8 +722,9 @@
       if (err.network) {
         unsure = true;
         $('amount').disabled = false;
+        $('productName').disabled = false;
         busy = false;
-        sheetError('Belum tersimpan. ' + err.message, save);
+        sheetError('Status simpan belum diketahui. ' + err.message, save);
         return;
       }
       hideSheet();
