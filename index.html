@@ -43,7 +43,6 @@
   .ctx-text b svg { width: 20px; height: 20px; }
   .ctx-text span { font-size: 14px; color: rgba(255,255,255,.85); }
   .ctx button { flex-shrink: 0; padding: 10px 16px; border-radius: 12px; background: rgba(255,255,255,.18); color: #fff; font-weight: 700; }
-  .ready-btn { width: 100%; margin-top: 12px; padding: 14px; border-radius: 14px; background: var(--accent); color: #fff; font-weight: 700; font-size: 17px; }
 
   main.wrap { padding-top: 24px; padding-bottom: calc(32px + env(safe-area-inset-bottom)); }
   .label { font-size: 13px; font-weight: 600; color: var(--muted); margin: 0 0 10px; }
@@ -251,7 +250,6 @@
     <div class="block">
       <p class="label">2. Pilih rak</p>
       <div class="racks" id="racks" role="group" aria-label="Rak"></div>
-      <button type="button" class="ready-btn hidden" id="readyBtn" onclick="setReady(true)">Lanjut scan</button>
     </div>
     </div>
 
@@ -515,7 +513,6 @@
     $('setup').classList.toggle('hidden', ready);
     $('ctx').classList.toggle('hidden', !ready);
     $('scanStep').classList.toggle('hidden', !ready);
-    $('readyBtn').classList.toggle('hidden', ready || !rack);
     $('pill').textContent = tag();
     $('ctxRack').textContent = rackLetter(rack);
     $('ctxRackName').textContent = rack;
