@@ -19,6 +19,7 @@ No servers. No database. No app store. Just a barcode scanner or phone camera, a
 | 🔎 **Physical scanner** | Scanner mode opens by default. Scan into the barcode field with a USB/Bluetooth keyboard scanner, then Enter opens the quantity dialog. Manual entry + **Cari** works too. |
 | 📷 **Camera scanning** | Choose **Kamera** to scan with your phone camera. Camera access is only requested when selected. |
 | ⬇️⬆️ **Barang Masuk / Keluar** | One tap to switch between stock in and stock out. |
+| 🗄️ **Stock per rack** | Pick a rack (Rak A, B, C…) before scanning. Stock in and out are counted per rack, and Barang Keluar can't take more than that rack holds. Mode and rack then stay pinned in the top bar until **Ubah**. |
 | 🆕 **Add products while receiving** | Unknown barcode in **Barang Masuk**? Enter its quantity and an optional name to add it to Products and record the stock-in. **Barang Keluar** only accepts existing products. |
 | 🔢 **Quantity after scan** | See the product and current stock first, then type how many. A preview shows the stock after saving. |
 | 🛡️ **Safe by default** | Can't take out more than you have. Wrong scan? Tap **Batal**. Saved by mistake? Tap **Batalkan**. |
@@ -45,22 +46,24 @@ No servers. No database. No app store. Just a barcode scanner or phone camera, a
 ## Using a physical scanner
 
 1. Open your personal setup link on the computer/browser you will use.
-2. Choose **Barang Masuk** or **Barang Keluar**. **Scanner** mode is selected by default.
+2. Choose **Barang Masuk** or **Barang Keluar**, then the rack. **Scanner** mode is selected by default.
 3. Scan into **Barcode barang**. Configure the scanner to send Enter after each barcode, or click **Cari**.
 4. Enter the quantity and click **Simpan**. The barcode field is ready for the next scan after saving or cancelling.
 
 The scanner must work as a keyboard (typing barcode text). To use a camera instead, choose **Kamera**. Returning to **Scanner** stops the camera.
 
-For a local preview, serve this folder (for example, `python3 -m http.server 8000`) and open `http://localhost:8000/preview/index.html#key=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa`. The preview uses mock products `SKU-001`, `SKU-002`, and `SKU-003`; it does not update the real sheet.
+For a local preview, serve this folder (for example, `python3 -m http.server 8000`) and open `http://localhost:8000/preview/index.html#key=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa`. The preview uses mock racks Rak A–C and products `SKU-001`, `SKU-002`, and `SKU-003`; it does not update the real sheet.
 
 ## 🗂️ The sheet
 
 | Tab | What's in it |
 |---|---|
-| **Products** | `SKU` · `Name` · `Qty`. The barcode is the SKU. |
-| **Log** | `Time` · `SKU` · `Name` · `Mode` · `Change` · `Qty after` · `User`. Every scan and undo. |
+| **Products** | `SKU` · `Name` · `Total` · `Rak A` · `Rak B` · `Rak C`. The barcode is the SKU. `Total` adds up the racks. Add a rack with **Stock Scanner → Tambah rak**. Racks end at the first blank header, so keep notes columns after an empty column. Before deleting or renaming a rack, move its stock out. |
+| **Log** | `Time` · `SKU` · `Name` · `Rack` · `Mode` · `Change` · `Qty after` · `User`. Every scan and undo; `Qty after` is that rack's stock. |
 | **Users** | `Name` · `Key` · `Active` · `Setup link`. One row per staff member. |
 | **Config** | The scanner page URL, used to build setup links. |
+
+Green cells are safe to edit by hand: product names, rack stock, user names, **Active**, and the scanner URL. Leave `SKU`, `Key`, `Total` and the whole **Log** tab alone.
 
 ## 👥 Adding staff
 
