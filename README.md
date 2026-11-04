@@ -2,9 +2,9 @@
 
 # 📦 Conan Stock Scanner
 
-**Scan a barcode with your phone. Stock updates in Google Sheets. That's it.**
+**Scan a barcode with a USB/Bluetooth scanner or your phone camera. Stock updates in Google Sheets.**
 
-No servers. No database. No app store. Just a phone camera, a spreadsheet, and a link.
+No servers. No database. No app store. Just a barcode scanner or phone camera, a spreadsheet, and a link.
 
 [**Open the scanner →**](https://clean-code-id.github.io/conan-stock-scanner/)
 
@@ -16,7 +16,8 @@ No servers. No database. No app store. Just a phone camera, a spreadsheet, and a
 
 | | |
 |---|---|
-| 📷 **Camera scanning** | Point any phone at a barcode. No scanner hardware, no typing. |
+| 🔎 **Physical scanner** | Scanner mode opens by default. Scan into the barcode field with a USB/Bluetooth keyboard scanner, then Enter opens the quantity dialog. Manual entry + **Cari** works too. |
+| 📷 **Camera scanning** | Choose **Kamera** to scan with your phone camera. Camera access is only requested when selected. |
 | ⬇️⬆️ **Barang Masuk / Keluar** | One tap to switch between stock in and stock out. |
 | 🔢 **Quantity after scan** | See the product and current stock first, then type how many. A preview shows the stock after saving. |
 | 🛡️ **Safe by default** | Can't take out more than you have. Wrong scan? Tap **Batal**. Saved by mistake? Tap **Batalkan**. |
@@ -39,6 +40,17 @@ No servers. No database. No app store. Just a phone camera, a spreadsheet, and a
 - **The page** is one static HTML file hosted on GitHub Pages. It has no secrets in it.
 - **The API** is a Google Apps Script web app attached to the sheet. It is not in this repo.
 - **The sheet** is the database, and stays private to its owner.
+
+## Using a physical scanner
+
+1. Open your personal setup link on the computer/browser you will use.
+2. Choose **Barang Masuk** or **Barang Keluar**. **Scanner** mode is selected by default.
+3. Scan into **Barcode barang**. Configure the scanner to send Enter after each barcode, or click **Cari**.
+4. Enter the quantity and click **Simpan**. The barcode field is ready for the next scan after saving or cancelling.
+
+The scanner must work as a keyboard (typing barcode text). To use a camera instead, choose **Kamera**. Returning to **Scanner** stops the camera.
+
+For a local preview, serve this folder (for example, `python3 -m http.server 8000`) and open `http://localhost:8000/preview/index.html#key=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa`. The preview uses mock products `SKU-001`, `SKU-002`, and `SKU-003`; it does not update the real sheet.
 
 ## 🗂️ The sheet
 

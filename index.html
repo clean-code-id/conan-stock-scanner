@@ -46,6 +46,17 @@
   .seg button.active.in { background: var(--in); color: #fff; }
   .seg button.active.out { background: var(--out); color: #fff; }
 
+  .source-tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+  .source-tabs button { flex: 1; padding: 12px; border: 1px solid var(--line); border-radius: 12px; font-weight: 600; background: var(--card); }
+  .source-tabs button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+  .scanner-panel { padding: 20px; border: 1px solid var(--line); border-radius: 20px; background: var(--card); }
+  .scanner-panel label { display: block; font-weight: 700; margin-bottom: 10px; }
+  .barcode-row { display: flex; gap: 8px; }
+  .barcode-row input { min-width: 0; width: 100%; border: 2px solid var(--line); border-radius: 12px; padding: 12px; font: inherit; }
+  .barcode-row input:focus { outline: none; border-color: var(--accent); }
+  .barcode-row button { padding: 12px 16px; border-radius: 12px; background: var(--accent); color: #fff; font-weight: 700; }
+  .scanner-panel p { margin: 12px 0 0; color: var(--muted); font-size: 14px; }
+
   .sheet-bg { position: fixed; inset: 0; z-index: 20; background: rgba(0,0,0,.45); display: flex; align-items: flex-end; justify-content: center; }
   .sheet { width: 100%; max-width: 480px; background: var(--card); border-radius: 24px 24px 0 0; padding: 20px 16px calc(16px + env(safe-area-inset-bottom)); animation: up .18s ease-out; }
   @keyframes up { from { transform: translateY(40px); } }
@@ -174,7 +185,7 @@
     <p id="gateText"></p>
     <ol class="steps hidden" id="gateSteps">
       <li>Minta link login pribadi ke atasan Anda</li>
-      <li>Buka link tersebut di HP ini</li>
+      <li>Buka link tersebut di perangkat ini</li>
       <li>Setelah itu Anda akan tetap masuk</li>
     </ol>
     <button class="retry hidden" id="gateRetry" onclick="init()">Coba lagi</button>
@@ -187,7 +198,7 @@
       <h1>Stock Scanner</h1>
       <div class="acct">
         <div class="me" onclick="toggleMenu()"><b id="userName">…</b><div class="avatar" id="avatar">?</div></div>
-        <div class="menu hidden" id="menu"><button onclick="signOut()">Keluar dari HP ini</button></div>
+        <div class="menu hidden" id="menu"><button onclick="signOut()">Keluar dari perangkat ini</button></div>
       </div>
     </div>
   </header>
@@ -204,7 +215,19 @@
 
     <div class="block">
       <p class="label">2. Scan barcode, lalu isi jumlahnya</p>
-      <div class="cam">
+      <div class="source-tabs" role="group" aria-label="Cara scan">
+        <button id="sourceScanner" type="button" aria-pressed="true" onclick="setSource('scanner')">Scanner</button>
+        <button id="sourceCamera" type="button" aria-pressed="false" onclick="setSource('camera')">Kamera</button>
+      </div>
+      <form id="scannerPanel" class="scanner-panel" onsubmit="scanBarcode(event)">
+        <label for="barcode">Barcode barang</label>
+        <div class="barcode-row">
+          <input id="barcode" type="text" placeholder="Scan atau ketik barcode" autocomplete="off" autocapitalize="off" spellcheck="false" aria-describedby="scannerHelp">
+          <button type="submit">Cari</button>
+        </div>
+        <p id="scannerHelp">Klik kolom barcode, lalu scan dengan scanner USB atau Bluetooth. Tekan Enter atau Cari jika belum terbuka.</p>
+      </form>
+      <div class="cam hidden" id="cameraPanel">
         <div id="reader"></div>
         <div class="frame"><div class="laser"></div></div>
         <div class="pill" id="pill">BARANG MASUK</div>
@@ -259,6 +282,7 @@
   const SPIN = '<span class="btn-spin"></span>';
   const $ = id => document.getElementById(id);
   let audio;
+  let inputSource = 'scanner', cameraTask = Promise.resolve();
 
   function store(k, v) {
     try { if (v === undefined) return localStorage.getItem(k) || ''; v ? localStorage.setItem(k, v) : localStorage.removeItem(k); } catch (e) { return ''; }
@@ -319,10 +343,10 @@
 
   // kind: 'loading' | 'nokey' | 'denied' | 'error'
   function gate(kind, detail) {
-    if (camOn) { cam.stop(); camOn = false; }
+    stopCamera();
     const v = {
       loading: ['spin', 'Sedang masuk…', 'Tunggu sebentar.'],
-      nokey: ['scan', 'Masuk untuk mulai scan', 'HP ini belum terdaftar.'],
+      nokey: ['scan', 'Masuk untuk mulai scan', 'Perangkat ini belum terdaftar.'],
       denied: ['lock', 'Link tidak berlaku lagi', 'Link ini mungkin sudah dinonaktifkan atau diganti. Minta link login baru ke atasan Anda.'],
       error: ['offline', 'Tidak dapat terhubung', 'Periksa koneksi internet Anda, lalu coba lagi.'],
     }[kind];
@@ -344,7 +368,7 @@
   });
 
   function signOut() {
-    if (!confirm('Keluar dari HP ini? Anda perlu membuka link login lagi untuk masuk.')) return;
+    if (!confirm('Keluar dari perangkat ini? Anda perlu membuka link login lagi untuk masuk.')) return;
     store('stockKey', null);
     key = '';
     $('menu').classList.add('hidden');
@@ -361,7 +385,7 @@
       $('avatar').textContent = me.user.trim().charAt(0).toUpperCase();
       $('gate').classList.add('hidden');
       $('scanView').classList.remove('hidden');
-      startCamera();
+      setSource(inputSource);
     } catch (err) {
       if (store('stockKey') || key) { if (!$('gate').classList.contains('bad')) gate('error'); }
     }
@@ -389,6 +413,7 @@
     document.querySelector('.seg .in').classList.toggle('active', m === 'IN');
     document.querySelector('.seg .out').classList.toggle('active', m === 'OUT');
     $('pill').textContent = m === 'IN' ? 'BARANG MASUK' : 'BARANG KELUAR';
+    focusBarcode();
   }
 
   function amountValue() {
@@ -419,6 +444,7 @@
 
   // Opens the sheet straight away with placeholders, so the scan feels instant while the lookup runs.
   function openSheetLoading(sku) {
+    $('barcode').disabled = true;
     pending = null;
     retry = null;
     $('sheet').querySelector('.sheet').className = 'sheet loading';
@@ -469,6 +495,7 @@
   }
 
   function hideSheet() {
+    $('barcode').disabled = false;
     retry = null;
     $('amount').blur();
     $('sheet').classList.add('hidden');
@@ -484,35 +511,77 @@
     resume();
   }
 
+  function focusBarcode() {
+    if (inputSource === 'scanner' && !busy && $('sheet').classList.contains('hidden') && !$('scanView').classList.contains('hidden')) {
+      $('barcode').focus({ preventScroll: true });
+    }
+  }
+
+  function setSource(source) {
+    if (busy || !$('sheet').classList.contains('hidden')) return;
+    inputSource = source;
+    $('sourceScanner').setAttribute('aria-pressed', source === 'scanner');
+    $('sourceCamera').setAttribute('aria-pressed', source === 'camera');
+    $('scannerPanel').classList.toggle('hidden', source !== 'scanner');
+    $('cameraPanel').classList.toggle('hidden', source !== 'camera');
+    if (source === 'camera') startCamera();
+    else { stopCamera(); focusBarcode(); }
+  }
+
+  function scanBarcode(event) {
+    event.preventDefault();
+    if (inputSource !== 'scanner' || busy || !$('sheet').classList.contains('hidden') || $('scanView').classList.contains('hidden')) return;
+    const code = $('barcode').value.trim();
+    if (!code) return focusBarcode();
+    $('barcode').value = '';
+    submit(code);
+  }
+
+  // Serialize camera operations, including switching away while permission is pending.
+  function stopCamera() {
+    cameraTask = cameraTask.then(async () => {
+      if (camOn) { await cam.stop(); camOn = false; }
+    }).catch(() => {});
+    return cameraTask;
+  }
+
   function startCamera() {
-    if (camOn) return;
-    $('camMsg').classList.remove('hidden');
-    $('camText').textContent = 'Menyalakan kamera…';
-    const F = Html5QrcodeSupportedFormats;
-    cam = cam || new Html5Qrcode('reader', {
-      formatsToSupport: [F.CODE_128, F.CODE_39, F.EAN_13, F.EAN_8, F.UPC_A, F.UPC_E, F.QR_CODE],
-      experimentalFeatures: { useBarCodeDetectorIfSupported: true },
-      verbose: false,
-    });
-    cam.start({ facingMode: 'environment' }, { fps: 12 }, onCode).then(() => {
-      camOn = true;
-      $('camMsg').classList.add('hidden');
-    }).catch(err => {
+    cameraTask = cameraTask.then(async () => {
+      if (camOn || inputSource !== 'camera' || $('scanView').classList.contains('hidden')) return;
       $('camMsg').classList.remove('hidden');
-      $('camText').textContent = 'Kamera tidak tersedia: ' + err;
-    });
+      $('camText').textContent = 'Menyalakan kamera…';
+      try {
+        const F = Html5QrcodeSupportedFormats;
+        cam = cam || new Html5Qrcode('reader', {
+          formatsToSupport: [F.CODE_128, F.CODE_39, F.EAN_13, F.EAN_8, F.UPC_A, F.UPC_E, F.QR_CODE],
+          experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+          verbose: false,
+        });
+        await cam.start({ facingMode: 'environment' }, { fps: 12 }, onCode);
+        camOn = true;
+        $('camMsg').classList.add('hidden');
+      } catch (err) {
+        $('camMsg').classList.remove('hidden');
+        $('camText').textContent = 'Kamera tidak tersedia. Izinkan akses kamera, atau pilih Scanner untuk scan tanpa kamera.';
+      }
+    }).catch(() => {});
+    return cameraTask;
   }
 
   function onCode(code) {
-    if (busy) return;
+    if (inputSource !== 'camera' || $('scanView').classList.contains('hidden') || busy || !$('sheet').classList.contains('hidden') || !code.trim()) return;
     // Pause the camera while this scan is processed so one barcode counts once.
     try { cam.pause(true); } catch (e) {}
     submit(code.trim());
   }
 
   function resume() {
-    setTimeout(() => { try { if (cam && camOn && !pending) cam.resume(); } catch (e) {} }, 900);
+    focusBarcode();
+    setTimeout(() => { try { if (inputSource === 'camera' && cam && camOn && !busy && $('sheet').classList.contains('hidden')) cam.resume(); } catch (e) {} }, 900);
   }
+
+  // Return focus after choosing the transaction type or returning to the browser.
+  window.addEventListener('focus', focusBarcode);
 
   function time() {
     return new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
@@ -585,7 +654,7 @@
         resume();
       }
     } finally {
-      if (id === lookupId) busy = false;
+      if (id === lookupId) { busy = false; focusBarcode(); }
     }
   }
 
@@ -651,6 +720,7 @@
       undoError(err.message);
     }
     busy = false;
+    focusBarcode();
   }
 
   // Keeps the scan card so "Batalkan" can be tapped again, with the reason underneath.
